@@ -1,0 +1,543 @@
+openapi: 3.0.3
+info:
+  title: GitLab Metrics Dashboard API
+  description: |
+    REST API for GitLab Metrics Dashboard application.
+    Provides endpoints for Four Keys metrics, team activity, and cycle time analysis.
+  version: 1.0.0
+  contact:
+    name: WorkMetrics Team
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.workmetrics.example.com/v1
+    description: Production server
+
+tags:
+  - name: Projects
+    description: Project management and configuration
+  - name: Four Keys
+    description: Four Keys DevOps metrics
+  - name: Team Activity
+    description: Team member activity and review load
+  - name: Cycle Time
+    description: Cycle time analysis and breakdown
+
+paths:
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List all connected projects
+      description: Returns a list of all GitLab projects configured in the system
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags: [Projects]
+      summary: Connect a new GitLab project
+      description: Add a new GitLab project to monitor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gitlab_project_id, gitlab_token]
+              properties:
+                gitlab_project_id:
+                  type: integer
+                  example: 12345
+                gitlab_token:
+                  type: string
+                  format: password
+                  example: glpat-xxxxxxxxxxxxxxxxxxxx
+      responses:
+        '201':
+          description: Project connected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Project already exists
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{project_id}:
+    get:
+      tags: [Projects]
+      summary: Get project details
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags: [Projects]
+      summary: Remove project
+      description: Remove a project from monitoring (does not delete GitLab project)
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '204':
+          description: Project removed successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{project_id}/refresh:
+    post:
+      tags: [Projects]
+      summary: Manually refresh project data
+      description: Triggers immediate data fetch from GitLab API
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '202':
+          description: Refresh initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Data refresh initiated
+                  task_id:
+                    type: string
+                    example: 550e8400-e29b-41d4-a716-446655440000
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Rate limit exceeded
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{project_id}/four-keys:
+    get:
+      tags: [Four Keys]
+      summary: Get Four Keys metrics
+      description: Returns Four Keys DevOps metrics for the specified time range
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TimeRangeStart'
+        - $ref: '#/components/parameters/TimeRangeEnd'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FourKeysMetrics'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{project_id}/team-activity:
+    get:
+      tags: [Team Activity]
+      summary: Get team member activity metrics
+      description: Returns activity metrics for all team members in the specified time range
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TimeRangeStart'
+        - $ref: '#/components/parameters/TimeRangeEnd'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team_members:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeamMemberActivity'
+                  summary:
+                    type: object
+                    properties:
+                      total_members:
+                        type: integer
+                        example: 12
+                      total_commits:
+                        type: integer
+                        example: 456
+                      total_mrs_created:
+                        type: integer
+                        example: 89
+                      total_reviews:
+                        type: integer
+                        example: 134
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{project_id}/cycle-time:
+    get:
+      tags: [Cycle Time]
+      summary: Get cycle time analysis
+      description: Returns cycle time breakdown and percentile analysis for the specified time range
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/TimeRangeStart'
+        - $ref: '#/components/parameters/TimeRangeEnd'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CycleTimeAnalysis'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check endpoint
+      description: Returns service health status
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      redis:
+                        type: string
+                        example: healthy
+        '503':
+          description: Service is unhealthy
+
+components:
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      description: Project unique identifier
+      schema:
+        type: string
+        format: uuid
+    
+    TimeRangeStart:
+      name: start_date
+      in: query
+      required: true
+      description: Start date of time range (YYYY-MM-DD)
+      schema:
+        type: string
+        format: date
+        example: '2025-10-01'
+    
+    TimeRangeEnd:
+      name: end_date
+      in: query
+      required: true
+      description: End date of time range (YYYY-MM-DD)
+      schema:
+        type: string
+        format: date
+        example: '2025-11-21'
+
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gitlab_project_id:
+          type: integer
+          example: 12345
+        name:
+          type: string
+          example: WorkMetrics
+        url:
+          type: string
+          format: uri
+          example: https://gitlab.com/example/workmetrics
+        last_sync_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FourKeysMetrics:
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        time_period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        deployment_frequency:
+          type: number
+          format: float
+          description: Deployments per day
+          example: 2.5
+        lead_time_hours:
+          type: number
+          format: float
+          description: Average lead time in hours
+          example: 48.5
+        change_failure_rate:
+          type: number
+          format: float
+          description: Percentage (0-100)
+          example: 15.2
+        mean_time_to_restore_hours:
+          type: number
+          format: float
+          description: Average MTTR in hours
+          example: 4.8
+        details:
+          type: object
+          properties:
+            total_deployments:
+              type: integer
+              example: 75
+            successful_deployments:
+              type: integer
+              example: 64
+            failed_deployments:
+              type: integer
+              example: 11
+        calculated_at:
+          type: string
+          format: date-time
+
+    TeamMemberActivity:
+      type: object
+      properties:
+        member:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            gitlab_user_id:
+              type: integer
+            username:
+              type: string
+              example: johndoe
+            name:
+              type: string
+              example: John Doe
+            avatar_url:
+              type: string
+              format: uri
+              nullable: true
+        activity:
+          type: object
+          properties:
+            commit_count:
+              type: integer
+              example: 45
+            merge_requests_created:
+              type: integer
+              example: 12
+            merge_requests_merged:
+              type: integer
+              example: 10
+            reviews_completed:
+              type: integer
+              example: 23
+            comments_written:
+              type: integer
+              example: 67
+            lines_added:
+              type: integer
+              example: 1234
+            lines_removed:
+              type: integer
+              example: 567
+
+    CycleTimeAnalysis:
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        time_period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        averages:
+          type: object
+          properties:
+            total_cycle_time_hours:
+              type: number
+              format: float
+              example: 72.5
+            coding_time_hours:
+              type: number
+              format: float
+              example: 24.0
+            review_time_hours:
+              type: number
+              format: float
+              example: 36.0
+            deployment_time_hours:
+              type: number
+              format: float
+              example: 12.5
+        percentiles:
+          type: object
+          properties:
+            p50:
+              type: number
+              format: float
+              description: Median cycle time in hours
+              example: 48.0
+            p75:
+              type: number
+              format: float
+              example: 96.0
+            p95:
+              type: number
+              format: float
+              example: 168.0
+        stage_breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              stage:
+                type: string
+                enum: [coding, review, deployment]
+              percentage:
+                type: number
+                format: float
+                description: Percentage of total cycle time
+                example: 33.1
+              average_hours:
+                type: number
+                format: float
+                example: 24.0
+        calculated_at:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        detail:
+          type: string
+          description: Detailed error information
+          nullable: true
+        request_id:
+          type: string
+          description: Request tracking ID
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Invalid time range
+            detail: end_date must be after start_date
+            request_id: req_abc123
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Project not found
+            detail: null
+            request_id: req_def456
+    
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Internal server error
+            detail: An unexpected error occurred
+            request_id: req_ghi789
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
