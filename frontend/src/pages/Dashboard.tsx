@@ -16,6 +16,24 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const tabs: Array<{ id: TabType; label: string; description: string }> = [
+    {
+      id: 'four-keys',
+      label: 'Four Keys Metrics',
+      description: 'DORA DevOps performance metrics',
+    },
+    {
+      id: 'team-activity',
+      label: 'Team Activity',
+      description: 'Individual contributions and review load',
+    },
+    {
+      id: 'cycle-time',
+      label: 'Cycle Time Analysis',
+      description: 'Stage breakdown and bottleneck identification',
+    },
+  ];
+
   const fetchProjects = async () => {
     try {
       setLoading(true);
@@ -35,6 +53,45 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  // Keyboard navigation for tabs
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (currentIndex > 0) {
+            setActiveTab(tabs[currentIndex - 1].id);
+          }
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          if (currentIndex < tabs.length - 1) {
+            setActiveTab(tabs[currentIndex + 1].id);
+          }
+          break;
+        case 'Home':
+          event.preventDefault();
+          setActiveTab(tabs[0].id);
+          break;
+        case 'End':
+          event.preventDefault();
+          setActiveTab(tabs[tabs.length - 1].id);
+          break;
+      }
+    };
+
+    // Only attach listener when tabs are in focus
+    const tabsContainer = document.querySelector('[role="tablist"]');
+    if (tabsContainer) {
+      tabsContainer.addEventListener('keydown', handleKeyDown as any);
+      return () => {
+        tabsContainer.removeEventListener('keydown', handleKeyDown as any);
+      };
+    }
+  }, [activeTab, tabs]);
 
   if (loading) {
     return (
@@ -65,24 +122,6 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const tabs: Array<{ id: TabType; label: string; description: string }> = [
-    {
-      id: 'four-keys',
-      label: 'Four Keys Metrics',
-      description: 'DORA DevOps performance metrics',
-    },
-    {
-      id: 'team-activity',
-      label: 'Team Activity',
-      description: 'Individual contributions and review load',
-    },
-    {
-      id: 'cycle-time',
-      label: 'Cycle Time Analysis',
-      description: 'Stage breakdown and bottleneck identification',
-    },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Project Selector */}
@@ -110,11 +149,20 @@ const Dashboard: React.FC = () => {
       {/* Tab Navigation */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
-          <nav className="flex -mb-px" aria-label="Tabs">
-            {tabs.map((tab) => (
+          <nav 
+            className="flex -mb-px" 
+            role="tablist"
+            aria-label="Dashboard metrics tabs"
+          >
+            {tabs.map((tab, index) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`${tab.id}-panel`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                id={`${tab.id}-tab`}
                 className={`
                   flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors
                   ${
@@ -134,11 +182,32 @@ const Dashboard: React.FC = () => {
 
       {/* Tab Content */}
       {selectedProject && (
-        <div>
-          {activeTab === 'four-keys' && <FourKeysTab projectId={selectedProject.id} />}
-          {activeTab === 'team-activity' && <TeamActivityTab projectId={selectedProject.id} />}
-          {activeTab === 'cycle-time' && <CycleTimeTab projectId={selectedProject.id} />}
-        </div>
+        <>
+          <div
+            role="tabpanel"
+            id="four-keys-panel"
+            aria-labelledby="four-keys-tab"
+            hidden={activeTab !== 'four-keys'}
+          >
+            {activeTab === 'four-keys' && <FourKeysTab projectId={selectedProject.id} />}
+          </div>
+          <div
+            role="tabpanel"
+            id="team-activity-panel"
+            aria-labelledby="team-activity-tab"
+            hidden={activeTab !== 'team-activity'}
+          >
+            {activeTab === 'team-activity' && <TeamActivityTab projectId={selectedProject.id} />}
+          </div>
+          <div
+            role="tabpanel"
+            id="cycle-time-panel"
+            aria-labelledby="cycle-time-tab"
+            hidden={activeTab !== 'cycle-time'}
+          >
+            {activeTab === 'cycle-time' && <CycleTimeTab projectId={selectedProject.id} />}
+          </div>
+        </>
       )}
     </div>
   );
