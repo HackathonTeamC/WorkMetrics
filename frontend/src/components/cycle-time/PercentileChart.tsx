@@ -8,7 +8,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 import { CycleTimeDistributionItem } from '../../types/cycleTime';
 
@@ -44,12 +43,6 @@ const PercentileChart: React.FC<PercentileChartProps> = ({ distribution }) => {
   const p75 = sortedTimes[Math.floor(sortedTimes.length * 0.75)];
   const p90 = sortedTimes[Math.floor(sortedTimes.length * 0.9)];
 
-  const getBarColor = (total: number): string => {
-    if (total >= p90) return '#ef4444'; // Red - slowest 10%
-    if (total >= p75) return '#f59e0b'; // Orange - slower 25%
-    if (total >= p50) return '#3b82f6'; // Blue - median
-    return '#10b981'; // Green - fastest 50%
-  };
 
   const formatTime = (hours: number): string => {
     if (hours < 1) return `${Math.round(hours * 60)}m`;
