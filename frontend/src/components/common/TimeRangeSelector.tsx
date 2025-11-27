@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, subDays, subWeeks } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { TimeRange } from '../../types/api';
 
 interface TimeRangeSelectorProps {
