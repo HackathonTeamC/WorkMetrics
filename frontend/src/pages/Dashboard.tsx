@@ -5,8 +5,9 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import FourKeysTab from '../components/four-keys/FourKeysTab';
 import TeamActivityTab from '../components/team-activity/TeamActivityTab';
+import CycleTimeTab from '../components/cycle-time/CycleTimeTab';
 
-type TabType = 'four-keys' | 'team-activity';
+type TabType = 'four-keys' | 'team-activity' | 'cycle-time';
 
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -75,6 +76,11 @@ const Dashboard: React.FC = () => {
       label: 'Team Activity',
       description: 'Individual contributions and review load',
     },
+    {
+      id: 'cycle-time',
+      label: 'Cycle Time Analysis',
+      description: 'Stage breakdown and bottleneck identification',
+    },
   ];
 
   return (
@@ -131,6 +137,7 @@ const Dashboard: React.FC = () => {
         <div>
           {activeTab === 'four-keys' && <FourKeysTab projectId={selectedProject.id} />}
           {activeTab === 'team-activity' && <TeamActivityTab projectId={selectedProject.id} />}
+          {activeTab === 'cycle-time' && <CycleTimeTab projectId={selectedProject.id} />}
         </div>
       )}
     </div>
