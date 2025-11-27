@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
+import ProjectSettings from './pages/ProjectSettings';
 
 const App: React.FC = () => {
   return (
@@ -10,7 +10,7 @@ const App: React.FC = () => {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects" element={<ProjectSettings />} />
         </Routes>
       </Layout>
     </Router>

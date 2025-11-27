@@ -38,4 +38,8 @@ class BaseModel(Base, TimestampMixin):
         }
 
 
-__all__ = ["Base", "BaseModel", "TimestampMixin"]
+# Import models to register them with SQLAlchemy
+from src.models.metrics import Deployment, FourKeysMetrics  # noqa: E402
+from src.models.project import Project  # noqa: E402
+
+__all__ = ["Base", "BaseModel", "TimestampMixin", "Project", "FourKeysMetrics", "Deployment"]
