@@ -154,7 +154,7 @@ const Dashboard: React.FC = () => {
             role="tablist"
             aria-label="Dashboard metrics tabs"
           >
-            {tabs.map((tab, index) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}

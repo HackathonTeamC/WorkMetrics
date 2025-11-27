@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -21,7 +21,7 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
@@ -79,7 +79,7 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+            {import.meta.env.DEV && this.state.errorInfo && (
               <details className="my-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
                 <summary className="text-sm font-semibold text-gray-900 cursor-pointer mb-2">
                   Stack Trace (Development Only)
