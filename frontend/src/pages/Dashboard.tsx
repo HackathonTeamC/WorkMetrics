@@ -4,10 +4,14 @@ import { Project } from '../types/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import FourKeysTab from '../components/four-keys/FourKeysTab';
+import TeamActivityTab from '../components/team-activity/TeamActivityTab';
+
+type TabType = 'four-keys' | 'team-activity';
 
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('four-keys');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +64,19 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  const tabs: Array<{ id: TabType; label: string; description: string }> = [
+    {
+      id: 'four-keys',
+      label: 'Four Keys Metrics',
+      description: 'DORA DevOps performance metrics',
+    },
+    {
+      id: 'team-activity',
+      label: 'Team Activity',
+      description: 'Individual contributions and review load',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Project Selector */}
@@ -84,8 +101,38 @@ const Dashboard: React.FC = () => {
         </select>
       </div>
 
-      {/* Four Keys Metrics */}
-      {selectedProject && <FourKeysTab projectId={selectedProject.id} />}
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px" aria-label="Tabs">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="text-base">{tab.label}</div>
+                <div className="text-xs mt-1 font-normal">{tab.description}</div>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {selectedProject && (
+        <div>
+          {activeTab === 'four-keys' && <FourKeysTab projectId={selectedProject.id} />}
+          {activeTab === 'team-activity' && <TeamActivityTab projectId={selectedProject.id} />}
+        </div>
+      )}
     </div>
   );
 };

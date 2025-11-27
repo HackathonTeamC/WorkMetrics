@@ -166,3 +166,193 @@ class DataRefreshService:
         self.metrics_calculator.save_metrics(project.id, metrics_data)
         
         logger.info(f"Metrics calculated and saved for project {project.id}")
+
+    async def refresh_team_activity_data(
+        self, project: Project, days_back: int = 90
+    ) -> dict[str, int]:
+        """
+        Refresh team activity data (MRs, reviews, team members) from GitLab.
+        
+        Args:
+            project: Project to refresh
+            days_back: Number of days to fetch historical data
+            
+        Returns:
+            Dictionary with counts of updated records
+        """
+        from src.models.team_member import MergeRequest, Review, TeamMember
+
+        logger.info(
+            f"Starting team activity data refresh for project {project.id} ({project.name})"
+        )
+
+        try:
+            # Fetch merge requests from GitLab
+            mrs_data = await self._fetch_merge_requests(project, days_back)
+            
+            # Process merge requests and team members
+            team_members_map = {}
+            saved_mrs = 0
+            
+            for mr_data in mrs_data:
+                # Get or create author
+                author = self._get_or_create_team_member(
+                    project, mr_data["author"], team_members_map
+                )
+                
+                # Process merge request
+                mr = self._process_merge_request(project, author, mr_data)
+                if mr:
+                    saved_mrs += 1
+                    
+                    # Fetch and process reviews for this MR
+                    await self._fetch_and_process_reviews(project, mr, team_members_map)
+            
+            self.db.commit()
+            
+            logger.info(
+                f"Team activity data refresh completed for project {project.id}: "
+                f"{saved_mrs} MRs, {len(team_members_map)} team members"
+            )
+            
+            return {
+                "merge_requests": saved_mrs,
+                "team_members": len(team_members_map),
+            }
+            
+        except Exception as e:
+            logger.error(
+                f"Error refreshing team activity for project {project.id}: {str(e)}",
+                exc_info=True,
+            )
+            self.db.rollback()
+            raise
+
+    async def _fetch_merge_requests(
+        self, project: Project, days_back: int
+    ) -> list[dict]:
+        """Fetch merge requests from GitLab API."""
+        logger.debug(f"Fetching merge requests for GitLab project {project.gitlab_id}")
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days_back)
+        
+        # Fetch from GitLab
+        params = {
+            "updated_after": start_date.isoformat(),
+            "per_page": 100,
+            "order_by": "updated_at",
+            "sort": "desc",
+        }
+        
+        mrs = await self.gitlab_client.get_project_merge_requests(
+            project.gitlab_id, params=params
+        )
+        
+        logger.debug(f"Fetched {len(mrs)} merge requests from GitLab")
+        return mrs
+
+    def _get_or_create_team_member(
+        self, project: Project, user_data: dict, members_map: dict
+    ) -> "TeamMember":
+        """Get or create a team member record."""
+        from src.models.team_member import TeamMember
+
+        gitlab_user_id = user_data["id"]
+        
+        # Check cache first
+        if gitlab_user_id in members_map:
+            return members_map[gitlab_user_id]
+        
+        # Check database
+        member = (
+            self.db.query(TeamMember)
+            .filter(
+                TeamMember.project_id == project.id,
+                TeamMember.gitlab_user_id == gitlab_user_id,
+            )
+            .first()
+        )
+        
+        if not member:
+            # Create new team member
+            member = TeamMember(
+                project_id=project.id,
+                gitlab_user_id=gitlab_user_id,
+                username=user_data.get("username", ""),
+                name=user_data.get("name", ""),
+                email=user_data.get("email"),
+                avatar_url=user_data.get("avatar_url"),
+            )
+            self.db.add(member)
+            self.db.flush()  # Get ID without committing
+            logger.debug(f"Created team member {member.username}")
+        
+        members_map[gitlab_user_id] = member
+        return member
+
+    def _process_merge_request(
+        self, project: Project, author: "TeamMember", mr_data: dict
+    ) -> "MergeRequest | None":
+        """Process and save merge request record."""
+        from src.models.team_member import MergeRequest
+
+        try:
+            # Check if MR already exists
+            existing = (
+                self.db.query(MergeRequest)
+                .filter(
+                    MergeRequest.project_id == project.id,
+                    MergeRequest.gitlab_mr_id == mr_data["id"],
+                )
+                .first()
+            )
+            
+            if existing:
+                # Update existing MR
+                existing.state = mr_data.get("state", existing.state)
+                existing.merged_at = self._parse_datetime(mr_data.get("merged_at"))
+                existing.closed_at = self._parse_datetime(mr_data.get("closed_at"))
+                existing.additions = mr_data.get("changes", {}).get("additions", 0)
+                existing.deletions = mr_data.get("changes", {}).get("deletions", 0)
+                return existing
+            else:
+                # Create new MR
+                mr = MergeRequest(
+                    project_id=project.id,
+                    author_id=author.id,
+                    gitlab_mr_id=mr_data["id"],
+                    gitlab_mr_iid=mr_data["iid"],
+                    title=mr_data["title"],
+                    state=mr_data.get("state", "opened"),
+                    created_at_gitlab=self._parse_datetime(mr_data["created_at"]),
+                    merged_at=self._parse_datetime(mr_data.get("merged_at")),
+                    closed_at=self._parse_datetime(mr_data.get("closed_at")),
+                    source_branch=mr_data.get("source_branch", ""),
+                    target_branch=mr_data.get("target_branch", ""),
+                    additions=mr_data.get("changes", {}).get("additions", 0),
+                    deletions=mr_data.get("changes", {}).get("deletions", 0),
+                )
+                self.db.add(mr)
+                self.db.flush()  # Get ID
+                logger.debug(f"Created merge request {mr.gitlab_mr_iid}")
+                return mr
+                
+        except Exception as e:
+            logger.error(f"Error processing MR {mr_data.get('iid')}: {str(e)}")
+            return None
+
+    async def _fetch_and_process_reviews(
+        self, project: Project, mr: "MergeRequest", members_map: dict
+    ) -> None:
+        """Fetch and process reviews for a merge request."""
+        from src.models.team_member import Review
+
+        # For simplicity, we'll simulate review data
+        # In a real implementation, this would fetch from GitLab API
+        # (notes/comments on the MR)
+        
+        # This is a placeholder - GitLab API doesn't have a direct "reviews" endpoint
+        # You'd need to fetch MR notes/comments and parse them
+        pass
