@@ -8,6 +8,7 @@ from src.models import BaseModel
 
 if TYPE_CHECKING:
     from src.models.metrics import Deployment, FourKeysMetrics
+    from src.models.team_member import MergeRequest, TeamMember
 
 
 class Project(BaseModel):
@@ -27,6 +28,12 @@ class Project(BaseModel):
     )
     deployments: Mapped[list["Deployment"]] = relationship(
         "Deployment", back_populates="project", cascade="all, delete-orphan"
+    )
+    team_members: Mapped[list["TeamMember"]] = relationship(
+        "TeamMember", back_populates="project", cascade="all, delete-orphan"
+    )
+    merge_requests: Mapped[list["MergeRequest"]] = relationship(
+        "MergeRequest", back_populates="project", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
