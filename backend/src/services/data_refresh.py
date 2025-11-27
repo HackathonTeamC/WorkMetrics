@@ -356,3 +356,34 @@ class DataRefreshService:
         # This is a placeholder - GitLab API doesn't have a direct "reviews" endpoint
         # You'd need to fetch MR notes/comments and parse them
         pass
+
+    async def calculate_and_cache_cycle_time(
+        self, project: Project, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any]:
+        """
+        Calculate cycle time metrics for a project and period.
+        
+        Note: Cycle time is calculated on-demand from MR data,
+        so no special data fetching is needed. This method is
+        provided for consistency with other metric calculations.
+        
+        Args:
+            project: Project to analyze
+            start_date: Start of analysis period
+            end_date: End of analysis period
+            
+        Returns:
+            Cycle time metrics
+        """
+        from src.services.cycle_time_analyzer import CycleTimeAnalyzer
+
+        logger.info(
+            f"Calculating cycle time metrics for project {project.id} "
+            f"from {start_date} to {end_date}"
+        )
+
+        analyzer = CycleTimeAnalyzer(self.db)
+        metrics = analyzer.calculate_cycle_time_metrics(project.id, start_date, end_date)
+
+        logger.info(f"Cycle time metrics calculated for project {project.id}")
+        return metrics
